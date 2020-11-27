@@ -243,7 +243,7 @@ def from_pandas(
     tabu_parent_nodes: List[str] = None,
     tabu_child_nodes: List[str] = None,
     show_progress: bool = False,
-    use_gpu: bool = False
+    use_gpu: bool = False,
     **kwargs
 ) -> StructureModel:
     """

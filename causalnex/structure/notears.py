@@ -94,6 +94,7 @@ def from_numpy(
         tabu_edges: list of edges(from, to) not to be included in the graph.
         tabu_parent_nodes: list of nodes banned from being a parent of any other nodes.
         tabu_child_nodes: list of nodes banned from being a child of any other nodes.
+        show_progress: show progress bar showing current dual ascent step if True
 
     Returns:
         StructureModel: a graph of conditional dependencies between data variables.
@@ -157,6 +158,7 @@ def from_numpy_lasso(
         tabu_edges: list of edges(from, to) not to be included in the graph.
         tabu_parent_nodes: list of nodes banned from being a parent of any other nodes.
         tabu_child_nodes: list of nodes banned from being a child of any other nodes.
+        show_progress: show progress bar showing current dual ascent step if True
 
     Returns:
         StructureModel: a graph of conditional dependencies between data variables.
@@ -225,6 +227,7 @@ def from_pandas(
         tabu_edges: list of edges(from, to) not to be included in the graph.
         tabu_parent_nodes: list of nodes banned from being a parent of any other nodes.
         tabu_child_nodes: list of nodes banned from being a child of any other nodes.
+        show_progress: show progress bar showing current dual ascent step if True
 
     Returns:
          StructureModel: graph of conditional dependencies between data variables.
@@ -309,6 +312,7 @@ def from_pandas_lasso(
         tabu_edges: list of edges(from, to) not to be included in the graph.
         tabu_parent_nodes: list of nodes banned from being a parent of any other nodes.
         tabu_child_nodes: list of nodes banned from being a child of any other nodes.
+        show_progress: show progress bar showing current dual ascent step if True
 
     Returns:
          StructureModel: graph of conditional dependencies between data variables.
@@ -420,7 +424,7 @@ def _learn_structure(
         obj_grad = loss_grad + (rho * (np.trace(E) - d) + alpha) * E.T * W * 2
         return obj_grad.flatten()
 
-    def optimize(rho, alpha, h, h_new):
+    def _dual_ascent_step(rho, alpha, h, h_new):
         while (rho < 1e20) and (h_new > 0.25 * h or h_new == np.inf):
             sol = sopt.minimize(_func, w_est, method="L-BFGS-B", jac=_grad, bounds=bnds)
             w_new = sol.x
@@ -448,7 +452,7 @@ def _learn_structure(
     # start optimisation
     if show_progress:
         for n_iter in tqdm(range(max_iter)):
-            rho, alpha, h, h_new = optimize(rho, alpha, h, h_new)
+            rho, alpha, h, h_new = _dual_ascent_step(rho, alpha, h, h_new)
             if h <= h_tol:
                 break
             if h > h_tol and n_iter == max_iter - 1:
@@ -456,7 +460,7 @@ def _learn_structure(
 
     else:
         for n_iter in range(max_iter):
-            rho, alpha, h, h_new = optimize(rho, alpha, h, h_new)
+            rho, alpha, h, h_new = _dual_ascent_step(rho, alpha, h, h_new)
             if h <= h_tol:
                 break
             if h > h_tol and n_iter == max_iter - 1:

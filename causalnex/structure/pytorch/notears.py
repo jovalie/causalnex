@@ -58,6 +58,8 @@ def from_numpy(
     tabu_edges: List[Tuple[int, int]] = None,
     tabu_parent_nodes: List[int] = None,
     tabu_child_nodes: List[int] = None,
+    show_progress: bool = False,
+    use_gpu: bool = False,
     **kwargs
 ) -> StructureModel:
     """
@@ -101,6 +103,10 @@ def from_numpy(
         tabu_parent_nodes: list of nodes banned from being a parent of any other nodes.
 
         tabu_child_nodes: list of nodes banned from being a child of any other nodes.
+
+        show_progress: show progress bar showing current dual ascent step if True
+
+        use_gpu: use gpu if it is set to True and CUDA is available.
 
         **kwargs: additional arguments for NOTEARS MLP model
 
@@ -183,7 +189,12 @@ def from_numpy(
         **kwargs
     )
 
-    model.fit(X, max_iter=max_iter)
+    model.fit(
+        X, 
+        max_iter=max_iter, 
+        show_progress=show_progress, 
+        use_gpu=use_gpu)
+    
     sm = StructureModel(model.adj)
     if w_threshold:
         sm.remove_edges_below_threshold(w_threshold)
@@ -231,6 +242,8 @@ def from_pandas(
     tabu_edges: List[Tuple[str, str]] = None,
     tabu_parent_nodes: List[str] = None,
     tabu_child_nodes: List[str] = None,
+    show_progress: bool = False,
+    use_gpu: bool = False
     **kwargs
 ) -> StructureModel:
     """
@@ -282,6 +295,10 @@ def from_pandas(
 
         tabu_child_nodes: list of nodes banned from being a child of any other nodes.
 
+        show_progress: show progress bar showing current dual ascent step if True
+
+        use_gpu: use gpu if it is set to True and CUDA is available.
+
         **kwargs: additional arguments for NOTEARS MLP model
 
     Returns:
@@ -332,6 +349,8 @@ def from_pandas(
         tabu_edges=tabu_edges,
         tabu_parent_nodes=tabu_parent_nodes,
         tabu_child_nodes=tabu_child_nodes,
+        show_progress=show_progress,
+        use_gpu=use_gpu
         **kwargs
     )
 

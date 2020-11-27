@@ -228,6 +228,8 @@ class NotearsMLP(nn.Module, BaseEstimator):
         max_iter: int = 100,
         h_tol: float = 1e-8,
         rho_max: float = 1e16,
+        show_progress: bool = False,
+        use_gpu: bool = True,
     ):
         """
         Fit NOTEARS MLP model using the input data x
@@ -236,18 +238,36 @@ class NotearsMLP(nn.Module, BaseEstimator):
             max_iter: max number of dual ascent steps during optimisation.
             h_tol: exit if h(w) < h_tol (as opposed to strict definition of 0).
             rho_max: to be updated
+            show_progress: show progress bar showing current dual ascent step if True
+            use_gpu: use gpu if it is set to True and CUDA is available
+
         """
+        if torch.cuda.is_available() and use_gpu:
+            self.device = torch.device("cuda")
+            self.fc1_pos.cuda()
+            self.fc1_neg.cuda()
+
         rho, alpha, h = 1.0, 0.0, np.inf
         X_torch = torch.from_numpy(x).float().to(self.device)
 
-        for n_iter in range(max_iter):
-            rho, alpha, h = self._dual_ascent_step(X_torch, rho, alpha, h, rho_max)
-            if h <= h_tol or rho >= rho_max:
-                break
-            if n_iter == max_iter - 1 and h > h_tol:
-                self._logger.warning(
-                    "Failed to converge. Consider increasing max_iter."
-                )
+        if show_progress:
+            for n_iter in tqdm(range(max_iter)):
+                rho, alpha, h = self._dual_ascent_step(X_torch, rho, alpha, h, rho_max)
+                if h <= h_tol or rho >= rho_max:
+                    break
+                if n_iter == max_iter - 1 and h > h_tol:
+                    self._logger.warning(
+                        "Failed to converge. Consider increasing max_iter."
+                    )
+        else: 
+            for n_iter in range(max_iter):
+                rho, alpha, h = self._dual_ascent_step(X_torch, rho, alpha, h, rho_max)
+                if h <= h_tol or rho >= rho_max:
+                    break
+                if n_iter == max_iter - 1 and h > h_tol:
+                    self._logger.warning(
+                        "Failed to converge. Consider increasing max_iter."
+                    )
 
         # calculate the adjacency matrix after the fitting is finished
         self.adj = (
@@ -350,6 +370,10 @@ class NotearsMLP(nn.Module, BaseEstimator):
                 # view_as to avoid deprecated pointwise semantics
                 p.data = flat_params_torch[offset : offset + n_params].view_as(p.data)
                 offset += n_params
+
+            if self.device.type == "cuda":
+                self.fc1_pos.cuda()
+                self.fc1_neg.cuda()
 
         def _func(flat_params: np.ndarray) -> Tuple[float, np.ndarray]:
             """

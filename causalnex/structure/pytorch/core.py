@@ -48,6 +48,7 @@ from sklearn.base import BaseEstimator
 from causalnex.structure.pytorch.dist_type._base import DistTypeBase
 from causalnex.structure.pytorch.nonlinear import LocallyConnected
 
+from tqdm import tqdm
 
 # Problem in pytorch 1.6 (_forward_unimplemented), fixed in next release:
 # pylint: disable=abstract-method
@@ -244,8 +245,9 @@ class NotearsMLP(nn.Module, BaseEstimator):
         """
         if torch.cuda.is_available() and use_gpu:
             self.device = torch.device("cuda")
-            self.fc1_pos.cuda()
-            self.fc1_neg.cuda()
+            self.dag_layer.cuda()
+            self._loc_lin_layer_weights.cuda()
+            print("Using device: ", torch.cuda.get_device_name(torch.cuda.current_device()))
 
         rho, alpha, h = 1.0, 0.0, np.inf
         X_torch = torch.from_numpy(x).float().to(self.device)
@@ -372,8 +374,8 @@ class NotearsMLP(nn.Module, BaseEstimator):
                 offset += n_params
 
             if self.device.type == "cuda":
-                self.fc1_pos.cuda()
-                self.fc1_neg.cuda()
+                self.dag_layer.cuda()
+                self._loc_lin_layer_weights.cuda()
 
         def _func(flat_params: np.ndarray) -> Tuple[float, np.ndarray]:
             """

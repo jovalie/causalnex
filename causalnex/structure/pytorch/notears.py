@@ -350,7 +350,7 @@ def from_pandas(
         tabu_parent_nodes=tabu_parent_nodes,
         tabu_child_nodes=tabu_child_nodes,
         show_progress=show_progress,
-        use_gpu=use_gpu
+        use_gpu=use_gpu,
         **kwargs
     )
 

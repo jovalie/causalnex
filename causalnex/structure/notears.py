@@ -51,6 +51,8 @@ import scipy.optimize as sopt
 
 from causalnex.structure.structuremodel import StructureModel
 
+from tqdm import tqdm
+
 __all__ = ["from_numpy", "from_pandas", "from_numpy_lasso", "from_pandas_lasso"]
 
 
@@ -62,6 +64,7 @@ def from_numpy(
     tabu_edges: List[Tuple[int, int]] = None,
     tabu_parent_nodes: List[int] = None,
     tabu_child_nodes: List[int] = None,
+    show_progress: bool = False
 ) -> StructureModel:
     """
     Learn the `StructureModel`, the graph structure describing conditional dependencies between variables
@@ -118,7 +121,7 @@ def from_numpy(
         for j in range(d)
     ]
 
-    return _learn_structure(X, bnds, max_iter, h_tol, w_threshold)
+    return _learn_structure(X, bnds, max_iter, h_tol, w_threshold, show_progress)
 
 
 def from_numpy_lasso(
@@ -130,6 +133,7 @@ def from_numpy_lasso(
     tabu_edges: List[Tuple[int, int]] = None,
     tabu_parent_nodes: List[int] = None,
     tabu_child_nodes: List[int] = None,
+    show_progress: bool = False
 ) -> StructureModel:
     """
     Learn the `StructureModel`, the graph structure with lasso regularisation
@@ -180,7 +184,7 @@ def from_numpy_lasso(
         for j in range(d)
     ] * 2
 
-    return _learn_structure_lasso(X, beta, bnds, max_iter, h_tol, w_threshold)
+    return _learn_structure_lasso(X, beta, bnds, max_iter, h_tol, w_threshold, show_progress)
 
 
 def from_pandas(
@@ -191,6 +195,7 @@ def from_pandas(
     tabu_edges: List[Tuple[str, str]] = None,
     tabu_parent_nodes: List[str] = None,
     tabu_child_nodes: List[str] = None,
+    show_progress: bool = False
 ) -> StructureModel:
     """
     Learn the `StructureModel`, the graph structure describing conditional dependencies between variables
@@ -258,6 +263,7 @@ def from_pandas(
         tabu_edges,
         tabu_parent_nodes,
         tabu_child_nodes,
+        show_progress
     )
 
     sm = StructureModel()
@@ -279,6 +285,7 @@ def from_pandas_lasso(
     tabu_edges: List[Tuple[str, str]] = None,
     tabu_parent_nodes: List[str] = None,
     tabu_child_nodes: List[str] = None,
+    show_progress: bool = False
 ) -> StructureModel:
     """
     Learn the `StructureModel`, the graph structure with lasso regularisation
@@ -341,6 +348,7 @@ def from_pandas_lasso(
         tabu_edges,
         tabu_parent_nodes,
         tabu_child_nodes,
+        show_progress
     )
 
     sm = StructureModel()
@@ -359,6 +367,7 @@ def _learn_structure(
     max_iter: int = 100,
     h_tol: float = 1e-8,
     w_threshold: float = 0.0,
+    show_progress: bool = False
 ) -> StructureModel:
     """
     Based on initial implementation at https://github.com/xunzheng/notears
@@ -411,6 +420,19 @@ def _learn_structure(
         obj_grad = loss_grad + (rho * (np.trace(E) - d) + alpha) * E.T * W * 2
         return obj_grad.flatten()
 
+    def optimize(rho, alpha, h, h_new):
+        while (rho < 1e20) and (h_new > 0.25 * h or h_new == np.inf):
+            sol = sopt.minimize(_func, w_est, method="L-BFGS-B", jac=_grad, bounds=bnds)
+            w_new = sol.x
+            h_new = _h(w_new)
+            if h_new > 0.25 * h:
+                rho *= 10
+
+        w_est, h = w_new, h_new
+        alpha += rho * h
+       
+        return rho, alpha, h, h_new
+    
     if X.size == 0:
         raise ValueError("Input data X is empty, cannot learn any structure")
     logging.info("Learning structure using 'NOTEARS' optimisation.")
@@ -424,20 +446,21 @@ def _learn_structure(
     rho, alpha, h, h_new = 1.0, 0.0, np.inf, np.inf
 
     # start optimisation
-    for n_iter in range(max_iter):
-        while (rho < 1e20) and (h_new > 0.25 * h or h_new == np.inf):
-            sol = sopt.minimize(_func, w_est, method="L-BFGS-B", jac=_grad, bounds=bnds)
-            w_new = sol.x
-            h_new = _h(w_new)
-            if h_new > 0.25 * h:
-                rho *= 10
+    if show_progress:
+        for n_iter in tqdm(range(max_iter)):
+            rho, alpha, h, h_new = optimize(rho, alpha, h, h_new)
+            if h <= h_tol:
+                break
+            if h > h_tol and n_iter == max_iter - 1:
+                warnings.warn("Failed to converge. Consider increasing max_iter.")
 
-        w_est, h = w_new, h_new
-        alpha += rho * h
-        if h <= h_tol:
-            break
-        if h > h_tol and n_iter == max_iter - 1:
-            warnings.warn("Failed to converge. Consider increasing max_iter.")
+    else:
+        for n_iter in range(max_iter):
+            rho, alpha, h, h_new = optimize(rho, alpha, h, h_new)
+            if h <= h_tol:
+                break
+            if h > h_tol and n_iter == max_iter - 1:
+                warnings.warn("Failed to converge. Consider increasing max_iter.")
 
     w_est[np.abs(w_est) <= w_threshold] = 0
     return StructureModel(w_est.reshape([d, d]))
@@ -450,6 +473,7 @@ def _learn_structure_lasso(
     max_iter: int = 100,
     h_tol: float = 1e-8,
     w_threshold: float = 0.0,
+    show_progress: bool = False
 ) -> StructureModel:
     """
     Based on initial implementation at https://github.com/xunzheng/notears

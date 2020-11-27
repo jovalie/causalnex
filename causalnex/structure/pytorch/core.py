@@ -247,7 +247,6 @@ class NotearsMLP(nn.Module, BaseEstimator):
             self.device = torch.device("cuda")
             self.dag_layer.cuda()
             self._loc_lin_layer_weights.cuda()
-            print("Using device: ", torch.cuda.get_device_name(torch.cuda.current_device()))
 
         rho, alpha, h = 1.0, 0.0, np.inf
         X_torch = torch.from_numpy(x).float().to(self.device)
